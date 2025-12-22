@@ -1,7 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export interface PricingAdvice {
   suggestedPrice: number;
   marginPercentage: number;
@@ -15,6 +13,9 @@ export const getPricingRecommendation = async (
   calculatedHpp: number
 ): Promise<PricingAdvice> => {
   try {
+    // Initialize right before use to ensure process.env.API_KEY is available
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
     const prompt = `
       I am running a Nasi Goreng / Fried Rice stall in Indonesia.
       I want to add a new menu item: "${itemName}".
