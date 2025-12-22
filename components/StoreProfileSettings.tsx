@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StoreProfile } from '../types';
-import { Store, MapPin, Phone, Share2, FileText, Save, CheckCircle, Trash2, AlertTriangle, Download, Upload, FileJson } from 'lucide-react';
+import { STORAGE_KEYS } from '../App';
+import { Store, Save, CheckCircle, Trash2, AlertTriangle, Download, Upload, FileJson } from 'lucide-react';
 
 interface StoreProfileSettingsProps {
   profile: StoreProfile;
@@ -31,23 +32,24 @@ const StoreProfileSettings: React.FC<StoreProfileSettingsProps> = ({ profile, on
 
   const handleFactoryReset = () => {
     if (confirm('PERINGATAN: Apakah Anda yakin ingin menghapus SEMUA DATA?\n\nSemua menu, riwayat transaksi, dan pengaturan akan dihapus permanen dari browser ini.')) {
-      localStorage.clear();
+      localStorage.removeItem(STORAGE_KEYS.MENU);
+      localStorage.removeItem(STORAGE_KEYS.TRANSACTIONS);
+      localStorage.removeItem(STORAGE_KEYS.PROFILE);
       window.location.reload();
     }
   };
 
-  // --- Export/Import Logic ---
   const handleExportData = () => {
     const allData = {
-      menu: JSON.parse(localStorage.getItem('NASIGOR_MENU_V1') || '[]'),
-      transactions: JSON.parse(localStorage.getItem('NASIGOR_TRANSACTIONS_V1') || '[]'),
-      profile: JSON.parse(localStorage.getItem('NASIGOR_PROFILE_V1') || '{}'),
+      menu: JSON.parse(localStorage.getItem(STORAGE_KEYS.MENU) || '[]'),
+      transactions: JSON.parse(localStorage.getItem(STORAGE_KEYS.TRANSACTIONS) || '[]'),
+      profile: JSON.parse(localStorage.getItem(STORAGE_KEYS.PROFILE) || '{}'),
       exportedAt: new Date().toISOString()
     };
     
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allData));
     const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href",     dataStr);
+    downloadAnchorNode.setAttribute("href", dataStr);
     downloadAnchorNode.setAttribute("download", `nasigor_pos_backup_${new Date().toISOString().split('T')[0]}.json`);
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
@@ -63,9 +65,9 @@ const StoreProfileSettings: React.FC<StoreProfileSettingsProps> = ({ profile, on
       try {
         const json = JSON.parse(e.target?.result as string);
         if (confirm('Import data akan menimpa data yang ada saat ini. Lanjutkan?')) {
-          if (json.menu) localStorage.setItem('NASIGOR_MENU_V1', JSON.stringify(json.menu));
-          if (json.transactions) localStorage.setItem('NASIGOR_TRX_V1', JSON.stringify(json.transactions));
-          if (json.profile) localStorage.setItem('NASIGOR_PROFILE_V1', JSON.stringify(json.profile));
+          if (json.menu) localStorage.setItem(STORAGE_KEYS.MENU, JSON.stringify(json.menu));
+          if (json.transactions) localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(json.transactions));
+          if (json.profile) localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(json.profile));
           
           alert('Data berhasil di-import! Aplikasi akan dimuat ulang.');
           window.location.reload();
@@ -130,47 +132,37 @@ const StoreProfileSettings: React.FC<StoreProfileSettingsProps> = ({ profile, on
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Backup & Restore Section */}
-        <div className="bg-indigo-50 rounded-2xl border border-indigo-100 p-8 shadow-sm">
-           <h3 className="font-bold text-indigo-800 mb-2 flex items-center gap-2">
-             <FileJson className="w-5 h-5" /> Backup & Pindah Data
-           </h3>
-           <p className="text-sm text-indigo-600 mb-6">
-             Gunakan fitur ini untuk memindahkan data dari laptop ke HP atau sebaliknya. Download file backup di laptop, lalu upload di HP Anda.
-           </p>
-           <div className="space-y-3">
-             <button 
-               onClick={handleExportData}
-               className="w-full py-3 bg-white border border-indigo-200 text-indigo-600 font-bold rounded-xl hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
-             >
-               <Download className="w-4 h-4" /> Download File Data (.json)
-             </button>
-             
-             <input type="file" ref={fileInputRef} onChange={handleImportData} accept=".json" className="hidden" />
-             <button 
-               onClick={() => fileInputRef.current?.click()}
-               className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-md shadow-indigo-100"
-             >
-               <Upload className="w-4 h-4" /> Upload & Restore Data
-             </button>
-           </div>
+        <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm space-y-4">
+          <h3 className="font-bold text-stone-800 flex items-center gap-2">
+            <Download className="w-5 h-5 text-indigo-500" /> Cadangkan Data
+          </h3>
+          <p className="text-sm text-stone-500">Unduh semua data menu dan transaksi ke dalam file JSON untuk disimpan sebagai backup.</p>
+          <button onClick={handleExportData} className="w-full py-3 border-2 border-dashed border-stone-200 rounded-xl font-bold text-stone-600 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2">
+            <FileJson className="w-5 h-5" /> Export ke JSON
+          </button>
         </div>
 
-        {/* Danger Zone */}
-        <div className="bg-red-50 rounded-2xl border border-red-100 p-8 shadow-sm">
-           <h3 className="font-bold text-red-700 mb-2 flex items-center gap-2">
-             <AlertTriangle className="w-5 h-5" /> Zona Bahaya
-           </h3>
-           <p className="text-sm text-red-600 mb-6">
-             Reset data akan menghapus permanen semua menu dan transaksi dari browser ini. Pastikan sudah backup jika data penting.
-           </p>
-           <button 
-             onClick={handleFactoryReset}
-             className="w-full py-3 bg-white border border-red-200 text-red-600 font-bold rounded-xl hover:bg-red-100 transition-all flex items-center justify-center gap-2"
-           >
-             <Trash2 className="w-4 h-4" /> Reset Semua Data
-           </button>
+        <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm space-y-4">
+          <h3 className="font-bold text-stone-800 flex items-center gap-2">
+            <Upload className="w-5 h-5 text-indigo-500" /> Pulihkan Data
+          </h3>
+          <p className="text-sm text-stone-500">Impor data dari file backup JSON sebelumnya. Data saat ini akan ditimpa.</p>
+          <input type="file" ref={fileInputRef} onChange={handleImportData} className="hidden" accept=".json" />
+          <button onClick={() => fileInputRef.current?.click()} className="w-full py-3 border-2 border-dashed border-stone-200 rounded-xl font-bold text-stone-600 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2">
+            <Upload className="w-5 h-5" /> Pilih File Backup
+          </button>
         </div>
+      </div>
+
+      <div className="bg-red-50 p-6 rounded-2xl border border-red-100 space-y-4">
+        <div className="flex items-center gap-2 text-red-600">
+          <AlertTriangle className="w-6 h-6" />
+          <h3 className="font-bold">Zona Bahaya</h3>
+        </div>
+        <p className="text-sm text-red-500/80">Menghapus semua data aplikasi secara permanen. Tindakan ini tidak dapat dibatalkan.</p>
+        <button onClick={handleFactoryReset} className="px-6 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all flex items-center gap-2 shadow-lg shadow-red-100">
+          <Trash2 className="w-5 h-5" /> Reset Pabrik (Hapus Semua)
+        </button>
       </div>
     </div>
   );

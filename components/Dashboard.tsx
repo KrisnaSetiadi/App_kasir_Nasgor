@@ -4,13 +4,12 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, Legend 
 } from 'recharts';
-import { Calendar, Wallet, TrendingUp, Users, Receipt, FileDown, Download } from 'lucide-react';
+import { Calendar, Wallet, TrendingUp, Users, Receipt, FileDown } from 'lucide-react';
 
 interface DashboardProps {
   transactions: Transaction[];
 }
 
-// Softer, pastel-like colors
 const COLORS = ['#fb923c', '#a78bfa', '#22d3ee', '#34d399', '#fb7185'];
 
 const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
@@ -19,27 +18,37 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
 
   const filteredTransactions = useMemo(() => {
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     
     return transactions.filter(t => {
       const tDate = new Date(t.timestamp);
       
       switch (filter) {
-        case TimeFilter.TODAY:
-          return t.timestamp >= todayStart;
-        case TimeFilter.WEEK:
-          const weekStart = new Date(now.setDate(now.getDate() - now.getDay())).getTime();
-          return t.timestamp >= weekStart;
-        case TimeFilter.MONTH:
-          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-          return t.timestamp >= monthStart;
+        case TimeFilter.TODAY: {
+          const startOfToday = new Date();
+          startOfToday.setHours(0, 0, 0, 0);
+          return t.timestamp >= startOfToday.getTime();
+        }
+        case TimeFilter.WEEK: {
+          const startOfWeek = new Date();
+          startOfWeek.setDate(now.getDate() - now.getDay());
+          startOfWeek.setHours(0, 0, 0, 0);
+          return t.timestamp >= startOfWeek.getTime();
+        }
+        case TimeFilter.MONTH: {
+          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+          startOfMonth.setHours(0, 0, 0, 0);
+          return t.timestamp >= startOfMonth.getTime();
+        }
         case TimeFilter.LIFETIME:
           return true;
-        case TimeFilter.CUSTOM:
+        case TimeFilter.CUSTOM: {
           if (!customRange.start || !customRange.end) return true;
-          const start = new Date(customRange.start).getTime();
-          const end = new Date(customRange.end).getTime() + 86400000;
-          return t.timestamp >= start && t.timestamp < end;
+          const start = new Date(customRange.start);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(customRange.end);
+          end.setHours(23, 59, 59, 999);
+          return t.timestamp >= start.getTime() && t.timestamp <= end.getTime();
+        }
         default:
           return true;
       }
@@ -48,7 +57,6 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
 
   const totalSales = filteredTransactions.reduce((acc, t) => acc + t.totalAmount, 0);
   const totalProfit = filteredTransactions.reduce((acc, t) => acc + t.totalProfit, 0);
-  const totalHpp = filteredTransactions.reduce((acc, t) => acc + t.totalHpp, 0);
   const totalOrders = filteredTransactions.length;
   const avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
 
@@ -58,10 +66,7 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
       return;
     }
 
-    // Header CSV
     const headers = ["ID Transaksi", "Tanggal", "Jam", "Pelanggan", "Items", "Sumber", "Pembayaran", "HPP", "Total Penjualan", "Profit"];
-    
-    // Map data to rows
     const rows = filteredTransactions.map(t => {
       const date = new Date(t.timestamp);
       return [
@@ -78,13 +83,11 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
       ];
     });
 
-    // Create CSV content
     const csvContent = [
       headers.join(','),
       ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
     ].join('\n');
 
-    // Create download link
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -115,13 +118,12 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 md:space-y-8 bg-transparent min-h-full">
-      {/* Filters Header */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center bg-white p-5 rounded-2xl shadow-sm border border-stone-100 gap-6">
         <div className="flex flex-col">
           <h2 className="text-xl font-bold text-stone-800 flex items-center gap-2">
             <TrendingUp className="text-orange-500 w-6 h-6" /> Laporan Penjualan
           </h2>
-          <p className="text-sm text-stone-400 mt-1">Analisis performa bisnis Anda</p>
+          <p className="text-sm text-stone-400 mt-1">Data terkini performa bisnis Anda</p>
         </div>
         
         <div className="flex flex-col md:flex-row gap-3 w-full xl:w-auto items-start md:items-center">
@@ -154,35 +156,13 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
         </div>
       </div>
 
-      {/* Scoreboard Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <StatCard 
-          icon={<Wallet className="w-6 h-6" />} 
-          label="Total Penjualan" 
-          value={`IDR ${totalSales.toLocaleString()}`} 
-          color="blue" 
-        />
-        <StatCard 
-          icon={<TrendingUp className="w-6 h-6" />} 
-          label="Estimasi Profit" 
-          value={`IDR ${totalProfit.toLocaleString()}`} 
-          color="green" 
-        />
-        <StatCard 
-          icon={<Receipt className="w-6 h-6" />} 
-          label="Total Transaksi" 
-          value={totalOrders.toString()} 
-          color="orange" 
-        />
-        <StatCard 
-          icon={<Users className="w-6 h-6" />} 
-          label="Rata-rata Order" 
-          value={`IDR ${Math.round(avgOrderValue).toLocaleString()}`} 
-          color="purple" 
-        />
+        <StatCard icon={<Wallet className="w-6 h-6" />} label="Total Penjualan" value={`IDR ${totalSales.toLocaleString()}`} color="blue" />
+        <StatCard icon={<TrendingUp className="w-6 h-6" />} label="Estimasi Profit" value={`IDR ${totalProfit.toLocaleString()}`} color="green" />
+        <StatCard icon={<Receipt className="w-6 h-6" />} label="Total Transaksi" value={totalOrders.toString()} color="orange" />
+        <StatCard icon={<Users className="w-6 h-6" />} label="Rata-rata Order" value={`IDR ${Math.round(avgOrderValue).toLocaleString()}`} color="purple" />
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-100 lg:col-span-2">
           <h3 className="font-bold text-stone-700 mb-6">Grafik Tren Penjualan</h3>
@@ -192,10 +172,7 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5f5f4" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#78716c', fontSize: 11}} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{fill: '#78716c', fontSize: 11}} tickFormatter={(value) => `Rp${value/1000}k`} />
-                <Tooltip 
-                  cursor={{fill: '#fafaf9'}}
-                  contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', backgroundColor: '#fff'}}
-                />
+                <Tooltip cursor={{fill: '#fafaf9'}} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', backgroundColor: '#fff'}} />
                 <Bar dataKey="sales" fill="#fb923c" radius={[6, 6, 0, 0]} barSize={40} />
               </BarChart>
             </ResponsiveContainer>
@@ -207,19 +184,8 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie
-                  data={sourceData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={65}
-                  outerRadius={85}
-                  paddingAngle={6}
-                  dataKey="value"
-                  cornerRadius={6}
-                >
-                  {sourceData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
+                <Pie data={sourceData} cx="50%" cy="50%" innerRadius={65} outerRadius={85} paddingAngle={6} dataKey="value" cornerRadius={6}>
+                  {sourceData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                 </Pie>
                 <Tooltip contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)'}} />
                 <Legend verticalAlign="bottom" height={36} iconType="circle" />
@@ -229,7 +195,6 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
         </div>
       </div>
 
-      {/* Recent Transactions Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
         <div className="px-6 py-5 border-b border-stone-100 flex justify-between items-center bg-stone-50/50">
           <h3 className="font-bold text-stone-700">Riwayat Transaksi Terakhir</h3>
@@ -239,11 +204,11 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
           <table className="w-full text-sm text-left">
             <thead className="bg-stone-50 text-stone-500 font-medium border-b border-stone-100">
               <tr>
-                <th className="px-6 py-4 whitespace-nowrap">ID & Waktu</th>
-                <th className="px-6 py-4 whitespace-nowrap">Pelanggan</th>
-                <th className="px-6 py-4 min-w-[200px]">Items</th>
-                <th className="px-6 py-4 whitespace-nowrap">Status & Pembayaran</th>
-                <th className="px-6 py-4 text-right whitespace-nowrap">Total</th>
+                <th className="px-6 py-4">ID & Waktu</th>
+                <th className="px-6 py-4">Pelanggan</th>
+                <th className="px-6 py-4">Items</th>
+                <th className="px-6 py-4">Status & Pembayaran</th>
+                <th className="px-6 py-4 text-right">Total</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-50">
@@ -259,24 +224,16 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-col gap-1">
-                      <span className="inline-flex w-fit px-2.5 py-1 rounded-md text-[10px] font-bold bg-stone-100 text-stone-600 border border-stone-200">
-                        {t.orderSource.replace('_', ' ')}
-                      </span>
-                      {t.paymentMethod && (
-                        <span className="inline-flex w-fit px-2.5 py-1 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">
-                          {t.paymentMethod}
-                        </span>
-                      )}
+                      <span className="inline-flex w-fit px-2.5 py-1 rounded-md text-[10px] font-bold bg-stone-100 text-stone-600 border border-stone-200 uppercase">{t.orderSource.replace('_', ' ')}</span>
+                      {t.paymentMethod && <span className="inline-flex w-fit px-2.5 py-1 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">{t.paymentMethod}</span>}
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-right font-bold text-stone-800 whitespace-nowrap">
-                    IDR {t.totalAmount.toLocaleString()}
-                  </td>
+                  <td className="px-6 py-4 text-right font-bold text-stone-800 whitespace-nowrap">IDR {t.totalAmount.toLocaleString()}</td>
                 </tr>
               ))}
               {filteredTransactions.length === 0 && (
                 <tr>
-                   <td colSpan={5} className="text-center py-12 text-stone-400">Belum ada transaksi</td>
+                   <td colSpan={5} className="text-center py-12 text-stone-400">Belum ada transaksi pada periode ini</td>
                 </tr>
               )}
             </tbody>
@@ -287,7 +244,6 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
   );
 };
 
-// Helper Component for Stats
 const StatCard = ({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: 'blue' | 'green' | 'orange' | 'purple' }) => {
   const colorStyles = {
     blue: 'bg-blue-50 text-blue-600',
@@ -295,12 +251,9 @@ const StatCard = ({ icon, label, value, color }: { icon: React.ReactNode; label:
     orange: 'bg-orange-50 text-orange-600',
     purple: 'bg-purple-50 text-purple-600'
   };
-
   return (
     <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-100 flex items-center gap-5 hover:shadow-md transition-shadow">
-      <div className={`p-4 rounded-xl ${colorStyles[color]} flex-shrink-0`}>
-        {icon}
-      </div>
+      <div className={`p-4 rounded-xl ${colorStyles[color]} flex-shrink-0`}>{icon}</div>
       <div>
         <p className="text-xs text-stone-500 font-semibold uppercase tracking-wide mb-1">{label}</p>
         <p className="text-2xl font-extrabold text-stone-800">{value}</p>
