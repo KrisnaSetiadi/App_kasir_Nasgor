@@ -44,16 +44,17 @@ export interface Transaction {
   totalHpp: number;
   totalProfit: number;
   orderSource: OrderSource;
-  paymentMethod?: PaymentMethod; // Optional if online (often handled by platform, but useful to track)
+  paymentMethod?: PaymentMethod; 
   customerName?: string;
-  cashGiven?: number; // Amount given by customer (only for CASH)
-  change?: number;    // Change returned (only for CASH)
+  cashGiven?: number;
+  change?: number;
 }
 
-export interface DateRange {
-  start: Date;
-  end: Date;
-  label: string;
+export interface Expenditure {
+  id: string;
+  timestamp: number;
+  description: string;
+  amount: number;
 }
 
 export enum TimeFilter {

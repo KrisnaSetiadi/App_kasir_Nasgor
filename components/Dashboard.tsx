@@ -1,43 +1,42 @@
 import React, { useState, useMemo } from 'react';
-import { Transaction, TimeFilter, OrderSource } from '../types';
+import { Transaction, TimeFilter, OrderSource, Expenditure } from '../types';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, Legend 
 } from 'recharts';
-import { Calendar, Wallet, TrendingUp, Users, Receipt, FileDown } from 'lucide-react';
+import { Calendar, Wallet, TrendingUp, Users, Receipt, FileDown, ArrowDownCircle, ArrowUpCircle, Banknote } from 'lucide-react';
 
 interface DashboardProps {
   transactions: Transaction[];
+  expenditures: Expenditure[];
 }
 
 const COLORS = ['#fb923c', '#a78bfa', '#22d3ee', '#34d399', '#fb7185'];
 
-const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
+const Dashboard: React.FC<DashboardProps> = ({ transactions, expenditures }) => {
   const [filter, setFilter] = useState<TimeFilter>(TimeFilter.TODAY);
   const [customRange, setCustomRange] = useState({ start: '', end: '' });
 
-  const filteredTransactions = useMemo(() => {
+  const filteredData = useMemo(() => {
     const now = new Date();
     
-    return transactions.filter(t => {
-      const tDate = new Date(t.timestamp);
-      
+    const filterFn = (timestamp: number) => {
       switch (filter) {
         case TimeFilter.TODAY: {
           const startOfToday = new Date();
           startOfToday.setHours(0, 0, 0, 0);
-          return t.timestamp >= startOfToday.getTime();
+          return timestamp >= startOfToday.getTime();
         }
         case TimeFilter.WEEK: {
           const startOfWeek = new Date();
           startOfWeek.setDate(now.getDate() - now.getDay());
           startOfWeek.setHours(0, 0, 0, 0);
-          return t.timestamp >= startOfWeek.getTime();
+          return timestamp >= startOfWeek.getTime();
         }
         case TimeFilter.MONTH: {
           const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
           startOfMonth.setHours(0, 0, 0, 0);
-          return t.timestamp >= startOfMonth.getTime();
+          return timestamp >= startOfMonth.getTime();
         }
         case TimeFilter.LIFETIME:
           return true;
@@ -47,52 +46,72 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
           start.setHours(0, 0, 0, 0);
           const end = new Date(customRange.end);
           end.setHours(23, 59, 59, 999);
-          return t.timestamp >= start.getTime() && t.timestamp <= end.getTime();
+          return timestamp >= start.getTime() && timestamp <= end.getTime();
         }
         default:
           return true;
       }
-    });
-  }, [transactions, filter, customRange]);
+    };
 
-  const totalSales = filteredTransactions.reduce((acc, t) => acc + t.totalAmount, 0);
-  const totalProfit = filteredTransactions.reduce((acc, t) => acc + t.totalProfit, 0);
-  const totalOrders = filteredTransactions.length;
-  const avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
+    return {
+      transactions: transactions.filter(t => filterFn(t.timestamp)),
+      expenditures: expenditures.filter(e => filterFn(e.timestamp))
+    };
+  }, [transactions, expenditures, filter, customRange]);
+
+  const totalSales = filteredData.transactions.reduce((acc, t) => acc + t.totalAmount, 0);
+  const totalOpProfit = filteredData.transactions.reduce((acc, t) => acc + t.totalProfit, 0);
+  const totalExpenditure = filteredData.expenditures.reduce((acc, e) => acc + e.amount, 0);
+  const netProfit = totalOpProfit - totalExpenditure;
+  const totalOrders = filteredData.transactions.length;
 
   const handleDownloadCSV = () => {
-    if (filteredTransactions.length === 0) {
+    if (filteredData.transactions.length === 0 && filteredData.expenditures.length === 0) {
       alert("Tidak ada data untuk di-download pada filter ini.");
       return;
     }
 
-    const headers = ["ID Transaksi", "Tanggal", "Jam", "Pelanggan", "Items", "Sumber", "Pembayaran", "HPP", "Total Penjualan", "Profit"];
-    const rows = filteredTransactions.map(t => {
+    const headers = ["Tipe", "ID/Keterangan", "Tanggal", "Jam", "Pelanggan/Kategori", "Total Penjualan", "HPP/Biaya", "Profit/Sisa"];
+    
+    const transRows = filteredData.transactions.map(t => {
       const date = new Date(t.timestamp);
       return [
+        "PENJUALAN",
         t.id,
         date.toLocaleDateString('id-ID'),
         date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-        t.customerName || 'Pelanggan Umum',
-        t.items.map(i => `${i.name} (${i.quantity})`).join('; '),
-        t.orderSource,
-        t.paymentMethod || '-',
-        t.totalHpp,
+        t.customerName || 'Umum',
         t.totalAmount,
+        t.totalHpp,
         t.totalProfit
+      ];
+    });
+
+    const expRows = filteredData.expenditures.map(e => {
+      const date = new Date(e.timestamp);
+      return [
+        "PENGELUARAN",
+        e.description,
+        date.toLocaleDateString('id-ID'),
+        date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+        "-",
+        0,
+        e.amount,
+        -e.amount
       ];
     });
 
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ...transRows.map(row => row.map(cell => `"${cell}"`).join(',')),
+      ...expRows.map(row => row.map(cell => `"${cell}"`).join(','))
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `Laporan_Penjualan_${filter}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `Laporan_Keuangan_${filter}_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -100,30 +119,21 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
 
   const salesData = useMemo(() => {
     const grouped: Record<string, number> = {};
-    filteredTransactions.forEach(t => {
+    filteredData.transactions.forEach(t => {
       const dateStr = new Date(t.timestamp).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
       grouped[dateStr] = (grouped[dateStr] || 0) + t.totalAmount;
     });
     return Object.keys(grouped).map(key => ({ name: key, sales: grouped[key] }));
-  }, [filteredTransactions]);
-
-  const sourceData = useMemo(() => {
-    const grouped: Record<string, number> = {};
-    filteredTransactions.forEach(t => {
-      const source = t.orderSource.replace('ONLINE_', '');
-      grouped[source] = (grouped[source] || 0) + 1;
-    });
-    return Object.keys(grouped).map(key => ({ name: key, value: grouped[key] }));
-  }, [filteredTransactions]);
+  }, [filteredData.transactions]);
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 md:space-y-8 bg-transparent min-h-full">
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center bg-white p-5 rounded-2xl shadow-sm border border-stone-100 gap-6">
         <div className="flex flex-col">
           <h2 className="text-xl font-bold text-stone-800 flex items-center gap-2">
-            <TrendingUp className="text-orange-500 w-6 h-6" /> Laporan Penjualan
+            <TrendingUp className="text-orange-500 w-6 h-6" /> Laporan Keuangan
           </h2>
-          <p className="text-sm text-stone-400 mt-1">Data terkini performa bisnis Anda</p>
+          <p className="text-sm text-stone-400 mt-1">Pantau performa pemasukan vs pengeluaran</p>
         </div>
         
         <div className="flex flex-col md:flex-row gap-3 w-full xl:w-auto items-start md:items-center">
@@ -140,16 +150,16 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
           </div>
           
           {filter === TimeFilter.CUSTOM && (
-            <div className="flex gap-2 items-center text-sm w-full md:w-auto animate-in fade-in slide-in-from-right-5">
-               <input type="date" className="border border-stone-200 rounded-lg px-3 py-2 bg-white text-stone-800 outline-none focus:ring-2 focus:ring-orange-200 w-full md:w-auto" onChange={e => setCustomRange(p => ({...p, start: e.target.value}))} />
+            <div className="flex gap-2 items-center text-sm w-full md:w-auto">
+               <input type="date" className="border border-stone-200 rounded-lg px-3 py-2 bg-white text-stone-800 outline-none w-full md:w-auto" onChange={e => setCustomRange(p => ({...p, start: e.target.value}))} />
                <span className="text-stone-400">-</span>
-               <input type="date" className="border border-stone-200 rounded-lg px-3 py-2 bg-white text-stone-800 outline-none focus:ring-2 focus:ring-orange-200 w-full md:w-auto" onChange={e => setCustomRange(p => ({...p, end: e.target.value}))} />
+               <input type="date" className="border border-stone-200 rounded-lg px-3 py-2 bg-white text-stone-800 outline-none w-full md:w-auto" onChange={e => setCustomRange(p => ({...p, end: e.target.value}))} />
             </div>
           )}
 
           <button 
             onClick={handleDownloadCSV}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-100 transition-all active:scale-[0.98] w-full md:w-auto whitespace-nowrap"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-100 transition-all active:scale-[0.98] w-full md:w-auto"
           >
             <FileDown className="w-4 h-4" /> Download CSV
           </button>
@@ -157,10 +167,10 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <StatCard icon={<Wallet className="w-6 h-6" />} label="Total Penjualan" value={`IDR ${totalSales.toLocaleString()}`} color="blue" />
-        <StatCard icon={<TrendingUp className="w-6 h-6" />} label="Estimasi Profit" value={`IDR ${totalProfit.toLocaleString()}`} color="green" />
-        <StatCard icon={<Receipt className="w-6 h-6" />} label="Total Transaksi" value={totalOrders.toString()} color="orange" />
-        <StatCard icon={<Users className="w-6 h-6" />} label="Rata-rata Order" value={`IDR ${Math.round(avgOrderValue).toLocaleString()}`} color="purple" />
+        <StatCard icon={<Wallet className="w-6 h-6" />} label="Pemasukan Kotor" value={`IDR ${totalSales.toLocaleString()}`} color="blue" />
+        <StatCard icon={<ArrowDownCircle className="w-6 h-6" />} label="Total Pengeluaran" value={`IDR ${totalExpenditure.toLocaleString()}`} color="red" />
+        <StatCard icon={<TrendingUp className="w-6 h-6" />} label="Laba Operasional" value={`IDR ${totalOpProfit.toLocaleString()}`} color="orange" sub="Sales - HPP" />
+        <StatCard icon={<Banknote className="w-6 h-6" />} label="Laba Bersih Akhir" value={`IDR ${netProfit.toLocaleString()}`} color={netProfit >= 0 ? 'green' : 'red'} sub="Op. Profit - Biaya" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -180,76 +190,33 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
         </div>
 
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-100">
-          <h3 className="font-bold text-stone-700 mb-6">Sumber Pesanan</h3>
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={sourceData} cx="50%" cy="50%" innerRadius={65} outerRadius={85} paddingAngle={6} dataKey="value" cornerRadius={6}>
-                  {sourceData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                </Pie>
-                <Tooltip contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)'}} />
-                <Legend verticalAlign="bottom" height={36} iconType="circle" />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
-        <div className="px-6 py-5 border-b border-stone-100 flex justify-between items-center bg-stone-50/50">
-          <h3 className="font-bold text-stone-700">Riwayat Transaksi Terakhir</h3>
-          <span className="text-xs font-semibold text-stone-400">{filteredTransactions.length} Transaksi ditampilkan</span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-stone-50 text-stone-500 font-medium border-b border-stone-100">
-              <tr>
-                <th className="px-6 py-4">ID & Waktu</th>
-                <th className="px-6 py-4">Pelanggan</th>
-                <th className="px-6 py-4">Items</th>
-                <th className="px-6 py-4">Status & Pembayaran</th>
-                <th className="px-6 py-4 text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-50">
-              {filteredTransactions.slice().reverse().slice(0, 50).map(t => (
-                <tr key={t.id} className="hover:bg-stone-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-bold text-stone-800">{t.id.slice(-8)}</div>
-                    <div className="text-xs text-stone-400 mt-0.5">{new Date(t.timestamp).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}, {new Date(t.timestamp).toLocaleDateString()}</div>
-                  </td>
-                  <td className="px-6 py-4 text-stone-700 whitespace-nowrap font-medium">{t.customerName}</td>
-                  <td className="px-6 py-4 text-stone-600">
-                    <span className="line-clamp-1">{t.items.map(i => `${i.name} (${i.quantity})`).join(', ')}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex flex-col gap-1">
-                      <span className="inline-flex w-fit px-2.5 py-1 rounded-md text-[10px] font-bold bg-stone-100 text-stone-600 border border-stone-200 uppercase">{t.orderSource.replace('_', ' ')}</span>
-                      {t.paymentMethod && <span className="inline-flex w-fit px-2.5 py-1 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">{t.paymentMethod}</span>}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right font-bold text-stone-800 whitespace-nowrap">IDR {t.totalAmount.toLocaleString()}</td>
-                </tr>
-              ))}
-              {filteredTransactions.length === 0 && (
-                <tr>
-                   <td colSpan={5} className="text-center py-12 text-stone-400">Belum ada transaksi pada periode ini</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+           <div className="flex justify-between items-center mb-6">
+             <h3 className="font-bold text-stone-700">Ringkasan Sesi Ini</h3>
+           </div>
+           <div className="space-y-4">
+              <SummaryItem label="Total Pesanan" value={totalOrders.toString()} icon={<Receipt className="w-4 h-4" />} />
+              <SummaryItem label="Beban Modal (HPP)" value={`IDR ${filteredData.transactions.reduce((a, t) => a + t.totalHpp, 0).toLocaleString()}`} icon={<ArrowDownCircle className="w-4 h-4" />} color="text-orange-500" />
+              <SummaryItem label="Biaya Lainnya" value={`IDR ${totalExpenditure.toLocaleString()}`} icon={<ArrowDownCircle className="w-4 h-4" />} color="text-red-500" />
+              <div className="pt-4 border-t border-stone-100 mt-4">
+                <div className="flex justify-between items-center">
+                   <span className="text-sm font-bold text-stone-800">Uang Tunai Bersih</span>
+                   <span className={`text-lg font-black ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>IDR {netProfit.toLocaleString()}</span>
+                </div>
+              </div>
+           </div>
         </div>
       </div>
     </div>
   );
 };
 
-const StatCard = ({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: 'blue' | 'green' | 'orange' | 'purple' }) => {
+const StatCard = ({ icon, label, value, color, sub }: { icon: React.ReactNode; label: string; value: string; color: 'blue' | 'green' | 'orange' | 'purple' | 'red'; sub?: string }) => {
   const colorStyles = {
     blue: 'bg-blue-50 text-blue-600',
     green: 'bg-green-50 text-green-600',
     orange: 'bg-orange-50 text-orange-600',
-    purple: 'bg-purple-50 text-purple-600'
+    purple: 'bg-purple-50 text-purple-600',
+    red: 'bg-red-50 text-red-600'
   };
   return (
     <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-100 flex items-center gap-5 hover:shadow-md transition-shadow">
@@ -257,9 +224,20 @@ const StatCard = ({ icon, label, value, color }: { icon: React.ReactNode; label:
       <div>
         <p className="text-xs text-stone-500 font-semibold uppercase tracking-wide mb-1">{label}</p>
         <p className="text-2xl font-extrabold text-stone-800">{value}</p>
+        {sub && <p className="text-[10px] text-stone-400 font-medium mt-0.5">{sub}</p>}
       </div>
     </div>
   );
 };
+
+const SummaryItem = ({ label, value, icon, color = "text-stone-600" }: { label: string; value: string; icon: React.ReactNode; color?: string }) => (
+  <div className="flex justify-between items-center text-sm">
+    <div className="flex items-center gap-2 text-stone-500">
+      {icon}
+      <span>{label}</span>
+    </div>
+    <span className={`font-bold ${color}`}>{value}</span>
+  </div>
+);
 
 export default Dashboard;

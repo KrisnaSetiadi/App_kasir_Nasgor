@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, ShoppingBasket, UtensilsCrossed, Menu, Settings, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, ShoppingBasket, UtensilsCrossed, Menu, Settings, ChevronRight, ReceiptText } from 'lucide-react';
 import MenuManager from './components/MenuManager';
 import POS from './components/POS';
 import Dashboard from './components/Dashboard';
 import StoreProfileSettings from './components/StoreProfileSettings';
-import { MenuItem, Transaction, Category, StoreProfile } from './types';
+import ExpenditureManager from './components/ExpenditureManager';
+import { MenuItem, Transaction, Category, StoreProfile, Expenditure } from './types';
 
 // Storage Keys - Consistent across all components
 export const STORAGE_KEYS = {
   MENU: 'NASIGOR_MENU_V1',
   TRANSACTIONS: 'NASIGOR_TRX_V1',
-  PROFILE: 'NASIGOR_PROFILE_V1'
+  PROFILE: 'NASIGOR_PROFILE_V1',
+  EXPENDITURES: 'NASIGOR_EXP_V1'
 };
 
 const INITIAL_MENU: MenuItem[] = [
@@ -34,6 +36,7 @@ enum View {
   DASHBOARD = 'DASHBOARD',
   POS = 'POS',
   MENU = 'MENU',
+  EXPENDITURES = 'EXPENDITURES',
   SETTINGS = 'SETTINGS'
 }
 
@@ -54,6 +57,13 @@ const App: React.FC = () => {
     } catch (e) { return []; }
   });
 
+  const [expenditures, setExpenditures] = useState<Expenditure[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.EXPENDITURES);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) { return []; }
+  });
+
   const [storeProfile, setStoreProfile] = useState<StoreProfile>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.PROFILE);
@@ -68,6 +78,10 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions));
   }, [transactions]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.EXPENDITURES, JSON.stringify(expenditures));
+  }, [expenditures]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(storeProfile));
@@ -91,6 +105,16 @@ const App: React.FC = () => {
     setTransactions(prev => [...prev, transaction]);
   };
 
+  const handleAddExpenditure = (exp: Expenditure) => {
+    setExpenditures(prev => [...prev, exp]);
+  };
+
+  const handleDeleteExpenditure = (id: string) => {
+    if(confirm("Hapus catatan pengeluaran ini?")) {
+      setExpenditures(prev => prev.filter(e => e.id !== id));
+    }
+  };
+
   const handleUpdateProfile = (profile: StoreProfile) => {
     setStoreProfile(profile);
   };
@@ -110,6 +134,7 @@ const App: React.FC = () => {
         <nav className="flex-1 w-full px-4 space-y-2">
           <NavButton active={currentView === View.POS} onClick={() => setCurrentView(View.POS)} icon={<ShoppingBasket className="w-5 h-5" />} label="Kasir (POS)" />
           <NavButton active={currentView === View.DASHBOARD} onClick={() => setCurrentView(View.DASHBOARD)} icon={<LayoutDashboard className="w-5 h-5" />} label="Laporan" />
+          <NavButton active={currentView === View.EXPENDITURES} onClick={() => setCurrentView(View.EXPENDITURES)} icon={<ReceiptText className="w-5 h-5" />} label="Pengeluaran" />
           <NavButton active={currentView === View.MENU} onClick={() => setCurrentView(View.MENU)} icon={<Menu className="w-5 h-5" />} label="Menu & HPP" />
           <NavButton active={currentView === View.SETTINGS} onClick={() => setCurrentView(View.SETTINGS)} icon={<Settings className="w-5 h-5" />} label="Pengaturan" />
         </nav>
@@ -118,7 +143,7 @@ const App: React.FC = () => {
           <div className="hidden lg:flex items-center gap-3 p-3 bg-stone-50 rounded-xl border border-stone-100">
              <div className="w-8 h-8 rounded-full bg-stone-200 flex items-center justify-center text-xs font-bold text-stone-500">v1</div>
              <div className="flex-1">
-               <p className="text-xs font-semibold text-stone-700">Versi 1.1.2</p>
+               <p className="text-xs font-semibold text-stone-700">Versi 1.1.5</p>
                <p className="text-[10px] text-stone-400">Database: Local</p>
              </div>
           </div>
@@ -139,7 +164,8 @@ const App: React.FC = () => {
           <div className="h-full overflow-y-auto overflow-x-hidden p-0 md:p-2">
              {currentView === View.POS && <POS menuItems={menuItems} onCompleteTransaction={handleTransactionComplete} storeProfile={storeProfile} />}
              {currentView === View.MENU && <MenuManager menuItems={menuItems} onAddMenuItem={handleAddMenuItem} onUpdateMenuItem={handleUpdateMenuItem} onDeleteMenuItem={handleDeleteMenuItem} />}
-             {currentView === View.DASHBOARD && <Dashboard transactions={transactions} />}
+             {currentView === View.DASHBOARD && <Dashboard transactions={transactions} expenditures={expenditures} />}
+             {currentView === View.EXPENDITURES && <ExpenditureManager expenditures={expenditures} onAddExpenditure={handleAddExpenditure} onDeleteExpenditure={handleDeleteExpenditure} />}
              {currentView === View.SETTINGS && <StoreProfileSettings profile={storeProfile} onUpdateProfile={handleUpdateProfile} />}
           </div>
         </main>
@@ -147,6 +173,7 @@ const App: React.FC = () => {
         <nav className="md:hidden fixed bottom-4 left-4 right-4 bg-white/90 backdrop-blur-lg border border-stone-200 shadow-xl rounded-2xl h-16 flex items-center justify-around z-50 px-2">
            <MobileNavButton active={currentView === View.POS} onClick={() => setCurrentView(View.POS)} icon={<ShoppingBasket className="w-5 h-5" />} label="Kasir" />
            <MobileNavButton active={currentView === View.DASHBOARD} onClick={() => setCurrentView(View.DASHBOARD)} icon={<LayoutDashboard className="w-5 h-5" />} label="Laporan" />
+           <MobileNavButton active={currentView === View.EXPENDITURES} onClick={() => setCurrentView(View.EXPENDITURES)} icon={<ReceiptText className="w-5 h-5" />} label="Keluar" />
            <MobileNavButton active={currentView === View.MENU} onClick={() => setCurrentView(View.MENU)} icon={<Menu className="w-5 h-5" />} label="Menu" />
            <MobileNavButton active={currentView === View.SETTINGS} onClick={() => setCurrentView(View.SETTINGS)} icon={<Settings className="w-5 h-5" />} label="Profil" />
         </nav>

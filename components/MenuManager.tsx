@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { MenuItem, Category } from '../types';
 import { getPricingRecommendation, PricingAdvice } from '../services/geminiService';
-import { Loader2, Sparkles, Plus, Trash2, Pencil, X, Save, Box, Tag } from 'lucide-react';
+import { Loader2, Sparkles, Plus, Trash2, Pencil, X, Save, Box, Tag, Banknote } from 'lucide-react';
 
 interface MenuManagerProps {
   menuItems: MenuItem[];
@@ -32,7 +32,7 @@ const MenuManager: React.FC<MenuManagerProps> = ({ menuItems, onAddMenuItem, onU
 
   const handleAskAI = async () => {
     if (!newItem.name || !newItem.hpp) {
-      alert("Mohon isi Nama Menu dan HPP terlebih dahulu.");
+      alert("Mohon isi Nama Menu dan HPP terlebih dahulu untuk dianalisis oleh AI.");
       return;
     }
     
@@ -55,15 +55,13 @@ const MenuManager: React.FC<MenuManagerProps> = ({ menuItems, onAddMenuItem, onU
   };
 
   const handleAddSave = () => {
-    // Basic validation. Note: Price might be 0 if AI wasn't used, which is allowed but maybe not ideal. 
-    // User can edit later via the modal.
-    if (newItem.name && newItem.hpp) {
+    if (newItem.name && newItem.hpp !== undefined && newItem.price !== undefined) {
       const item: MenuItem = {
         id: Date.now().toString(),
         name: newItem.name,
         category: newItem.category || Category.FOOD,
         hpp: Number(newItem.hpp),
-        price: Number(newItem.price), // This comes from AI or defaults to 0
+        price: Number(newItem.price),
         promoPrice: Number(newItem.promoPrice) > 0 ? Number(newItem.promoPrice) : undefined,
         description: newItem.description || '',
         isPopular: false
@@ -76,7 +74,7 @@ const MenuManager: React.FC<MenuManagerProps> = ({ menuItems, onAddMenuItem, onU
       setIngredients('');
       setAdvice(null);
     } else {
-      alert("Mohon lengkapi data menu (Nama, HPP).");
+      alert("Mohon lengkapi data menu (Nama, HPP, dan Harga Jual).");
     }
   };
 
@@ -143,34 +141,66 @@ const MenuManager: React.FC<MenuManagerProps> = ({ menuItems, onAddMenuItem, onU
               </div>
               <div>
                 <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">HPP (Modal)</label>
-                <input 
-                  type="number" 
-                  value={newItem.hpp || ''} 
-                  onChange={e => setNewItem({...newItem, hpp: Number(e.target.value)})}
-                  className="w-full px-4 py-2.5 border border-stone-200 rounded-xl focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none bg-white text-stone-900 placeholder:text-stone-300"
-                  placeholder="0"
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-stone-400 font-bold text-sm">Rp</span>
+                  <input 
+                    type="number" 
+                    value={newItem.hpp || ''} 
+                    onChange={e => setNewItem({...newItem, hpp: Number(e.target.value)})}
+                    className="w-full pl-10 pr-4 py-2.5 border border-stone-200 rounded-xl focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none bg-white text-stone-900 placeholder:text-stone-300 font-bold"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wide mb-2">Harga Jual</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-stone-400 font-bold text-sm">Rp</span>
+                  <input 
+                    type="number" 
+                    value={newItem.price || ''} 
+                    onChange={e => setNewItem({...newItem, price: Number(e.target.value)})}
+                    className="w-full pl-10 pr-4 py-2.5 border border-stone-300 rounded-xl focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none bg-white text-stone-900 font-bold shadow-sm"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-red-500 uppercase tracking-wide mb-2">Harga Promo</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-red-300 font-bold text-sm">Rp</span>
+                  <input 
+                    type="number" 
+                    value={newItem.promoPrice || ''} 
+                    onChange={e => setNewItem({...newItem, promoPrice: Number(e.target.value)})}
+                    className="w-full pl-10 pr-4 py-2.5 border border-stone-200 rounded-xl focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none bg-white text-stone-900 placeholder:text-stone-200"
+                    placeholder="Opsional"
+                  />
+                </div>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">Komposisi (Untuk AI)</label>
+              <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">Komposisi (Opsional untuk AI)</label>
               <textarea 
                 value={ingredients}
                 onChange={e => setIngredients(e.target.value)}
                 className="w-full px-4 py-2.5 border border-stone-200 rounded-xl focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none bg-white text-stone-900 placeholder:text-stone-300"
                 placeholder="Contoh: Nasi, Telur 2, Sosis, Bumbu racik..."
-                rows={3}
+                rows={2}
               />
             </div>
             
             <button 
               onClick={handleAskAI}
               disabled={loadingAI}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-indigo-200 transition-all disabled:opacity-70 active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white border-2 border-indigo-100 text-indigo-600 font-bold rounded-xl shadow-sm hover:bg-indigo-50 transition-all disabled:opacity-70 active:scale-[0.98]"
             >
               {loadingAI ? <Loader2 className="animate-spin w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
-              Hitung HPP & Saran Harga AI
+              Dapatkan Saran Harga AI (Opsional)
             </button>
           </div>
 
@@ -187,27 +217,25 @@ const MenuManager: React.FC<MenuManagerProps> = ({ menuItems, onAddMenuItem, onU
                        <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Margin {advice.marginPercentage}%</span>
                     </div>
                  </div>
-                 <div className="text-xs text-stone-600 space-y-3 bg-white p-4 rounded-xl border border-stone-200/50">
+                 <div className="text-xs text-stone-600 space-y-3 bg-white p-4 rounded-xl border border-stone-200/50 max-h-[150px] overflow-y-auto custom-scrollbar">
                    <p><strong className="text-stone-800">Kenapa harga ini?</strong><br/> {advice.reasoning}</p>
                    <p><strong className="text-stone-800">Analisa Pasar:</strong><br/> {advice.competitorAnalysis}</p>
                  </div>
                </div>
             ) : (
                 <div className="mb-4 flex flex-col items-center justify-center text-stone-400 text-sm p-8 text-center border-2 border-dashed border-stone-200 rounded-xl h-full">
-                  <Sparkles className="w-8 h-8 mb-3 text-stone-300" />
-                  <p className="font-medium text-stone-500">Belum ada analisis</p>
-                  <p className="text-xs mt-1 max-w-[200px]">Isi data menu dan klik tombol AI untuk mendapatkan saran harga cerdas.</p>
+                  <Banknote className="w-8 h-8 mb-3 text-stone-300" />
+                  <p className="font-medium text-stone-500">Input Manual atau Gunakan AI</p>
+                  <p className="text-xs mt-1 max-w-[200px]">Anda bisa langsung mengisi harga jual di sebelah kiri atau klik tombol AI untuk saran cerdas.</p>
                 </div>
             )}
 
             <div className={`mt-auto ${advice ? 'pt-6 border-t border-stone-200/50' : ''}`}>
-               {/* Note: Price inputs removed from Add form as requested. Price is set by AI or defaults to 0. */}
-               
                <button 
                   onClick={handleAddSave}
-                  className="w-full py-3.5 font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 active:scale-[0.98] bg-orange-500 hover:bg-orange-600 text-white shadow-orange-200"
+                  className="w-full py-4 font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 active:scale-[0.98] bg-orange-500 hover:bg-orange-600 text-white shadow-orange-200"
                >
-                 <Plus className="w-5 h-5" /> Simpan Menu
+                 <Plus className="w-5 h-5" /> Simpan Menu Ke Daftar
                </button>
             </div>
           </div>
